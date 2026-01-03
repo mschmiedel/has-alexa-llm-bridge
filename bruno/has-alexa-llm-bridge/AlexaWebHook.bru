@@ -1,0 +1,21 @@
+meta {
+  name: AlexaWebHook
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{has_baseUrl}}/alexa-webhook
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "query": "Ist es draußen schon dunkel?"
+  }
+}
+
+settings {
+  encodeUrl: true
+}
