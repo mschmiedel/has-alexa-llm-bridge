@@ -1,0 +1,15 @@
+meta {
+  name: DebugHaData
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{has_baseUrl}}/api/debug/ha-data
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}

@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "has-alexa-llm-bridge",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}
