@@ -4,10 +4,16 @@ meta {
   seq: 4
 }
 
-get {
-  url: {{has_baseUrl}}/api/debug/ha-data
-  body: none
+post {
+  url: {{has_baseUrl}}/api/ask
+  body: json
   auth: inherit
+}
+
+body:json {
+  {
+    "query": "Ist es draußen schon dunkel?"
+  }
 }
 
 settings {
