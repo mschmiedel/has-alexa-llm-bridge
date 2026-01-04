@@ -16,7 +16,7 @@ HA_URL = os.getenv("HA_URL")
 HA_TOKEN = os.getenv("HA_TOKEN")
 WATCH_ENTITIES = os.getenv("WATCH_ENTITIES", "").split(",")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-2.5-flash") # Auf 2.0 geändert für neues SDK
+AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-2.5-flash-lite") # Auf 2.0 geändert für neues SDK
 
 # NEU: Ein Secret Token für Alexa
 ALEXA_ACCESS_TOKEN = os.getenv("ALEXA_ACCESS_TOKEN", "testAccessToken")
@@ -194,8 +194,20 @@ async def handle_alexa(request: Request, token: str = Query(None)):
                 
                 Anweisung:
                 1. Wenn der User etwas schalten will (Licht an/aus), NUTZE das Tool 'control_device'.
-                2. Wenn der User eine Info will, antworte basierend auf den Sensorwerten.
-                3. Antworte immer kurz auf Deutsch.
+                2. Energie-Beratung: Wenn der User fragt, ob er Großgeräte (Waschmaschine, Spülmaschine, Trockner usw.) nutzen soll:
+                    - Prüfe:
+                        'netz_saldo_watt'. Negativ bedeutet Überschuss/Einspeisung.
+                        'co2_intensität'. Über 300 ist eher unsauber.
+                        'sensor.senec_battery_charge_percent und sensor.senec_battery_state_power'. Nehme 10kWh Akku an, negative Power bedeutet Akku entlädt
+                        Geräte: Spülmaschine rechne 2500W, Waschmaschine rechne 1000W, Trockner rechne 600W.    
+                    - Empfiehl 'JETZT', wenn der Überschuss für den typischen Geräteverbrauch reicht.
+                    - Empfiehl 'WARTEN', wenn kein Überschuss da ist, aber 'pv_rest_prognose_kwh' gute Chancen bietet, das Gerät zu versorgen.
+                    - Empfiehl 'SPÄTER/NACHTS', wenn weder Überschuss noch Prognose gut sind, co2 Intensität gerade nicht sauber ist.
+                    - Empfiehl 'EGAL' wenn alle oberen Bedingungen nicht zutreffen.
+                3. Wenn der User eine Info will, antworte basierend auf den Sensorwerten.
+                4. Antworte immer kurz auf Deutsch: 
+                    - Vollständiger Satz mit maximal 30 Wörtern.
+                    - Keine 'ich prüfe...' Aussagen, immer direkt eine Antwort liefern! 
                 
                 User Input: "{user_query}"
                 """
@@ -249,7 +261,9 @@ async def handle_alexa(request: Request, token: str = Query(None)):
                                 response_text = "Ich habe keine gültige Geräte-ID gefunden."
                     else:
                         # Gemini will nur reden (normale Antwort)
-                        response_text = response.text if response.text else "Ich habe keine Antwort."
+                        print(f"RESPONSE TEXT: {response.text}")
+
+                    response_text = response.text if response.text else "Ich habe keine Antwort."
 
                 except Exception as ai_error:
                     print(f"GEMINI ERROR: {ai_error}")
