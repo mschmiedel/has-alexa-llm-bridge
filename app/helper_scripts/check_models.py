@@ -2,7 +2,7 @@
 import os
 from dotenv import load_dotenv
 
-from genai.client import get_client
+from genai_client.client import get_client
 
 load_dotenv()
 

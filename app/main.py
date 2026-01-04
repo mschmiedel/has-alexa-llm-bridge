@@ -3,7 +3,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, Request, Query
 from dotenv import load_dotenv
 
-from genai.client import get_client
+from genai_client.client import get_client
 from const import Category, ALEXA_ACCESS_TOKEN, HA_URL, HA_TOKEN
 from category_handler.advice_handler import AdviceHandler
 from category_handler.control_handler import ControlHandler

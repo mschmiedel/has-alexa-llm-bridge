@@ -2,7 +2,7 @@ import json
 
 from category_handler.base import BaseHandler
 from const import AI_MODEL_NAME, tools_schema
-from genai.client import get_client
+from genai_client.client import get_client
 from ha_service.main import execute_ha_service
 
 
