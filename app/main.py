@@ -1,308 +1,230 @@
-import os
 import json
 import httpx
-from google import genai  # <--- NEUER IMPORT
 from fastapi import FastAPI, HTTPException, Request, Query
-from pydantic import BaseModel
 from dotenv import load_dotenv
 
+from genai.client import get_client
+from const import Category, ALEXA_ACCESS_TOKEN, HA_URL, HA_TOKEN
+from category_handler.advice_handler import AdviceHandler
+from category_handler.control_handler import ControlHandler
+from category_handler.info_handler import InfoHandler
+
+# ---------------------------------------------------------
+# DAS STRATEGY MAPPING (Der "Router")
+# Wir mappen Enum -> Klasse
+# ---------------------------------------------------------
+HANDLER_REGISTRY = {
+    Category.ADVICE: AdviceHandler,
+    Category.CONTROL: ControlHandler,
+    Category.INFO: InfoHandler,
+}
 # 1. Config & Setup
 load_dotenv()
 
+print(f"HA_URL:", HA_URL)
+
 app = FastAPI(title="Smart Home AI")
 
-# Konfiguration
-HA_URL = os.getenv("HA_URL")
-HA_TOKEN = os.getenv("HA_TOKEN")
-WATCH_ENTITIES = os.getenv("WATCH_ENTITIES", "").split(",")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-2.5-flash-lite") # Auf 2.0 geändert für neues SDK
 
-# NEU: Ein Secret Token für Alexa
-ALEXA_ACCESS_TOKEN = os.getenv("ALEXA_ACCESS_TOKEN", "testAccessToken")
+# --- DEFINITIONEN FÜR FILTERUNG & MAPPING ---
 
-# Definition der Werkzeuge, die Gemini nutzen darf
-tools_schema = [
-    {
-        "name": "control_device",
-        "description": "Schaltet ein Smart Home Gerät an oder aus.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "entity_id": {
-                    "type": "STRING",
-                    "description": "Die ID des Geräts, z.B. light.wohnzimmer oder switch.steckdose"
-                },
-                "action": {
-                    "type": "STRING",
-                    "description": "Die Aktion: 'turn_on' oder 'turn_off'",
-                    "enum": ["turn_on", "turn_off"]
-                }
-            },
-            "required": ["entity_id", "action"]
-        }
-    }
-]
+# 1. Energie-Sensoren: Mapping von "Sprechender Name" -> "Deine Entity ID"
+ENERGY_MAPPING = {
+    "netz_saldo_watt": "sensor.senec_grid_state_power",
+    "pv_aktuell_watt": "sensor.senec_solar_generated_power",
+    "pv_rest_prognose_kwh": "sensor.solar_energy_remaining_today",
+    "batterie_haus_prozent": "sensor.senec_battery_charge_percent",
+    "batterie_auto_prozent": "sensor.mgzsev_soc",
+    "aktuelle-co2-prozent": "sensor.electricity_maps_anteil_fossiler_brennstoffe_im_netz",
+    "niedrigste-co2-prozent": "sensor.strom_prognose_analyse",
+    "niedrigste-co2-uhrzeit": "sensor.strom_prognose_analyse_timestamp",
+    "waschkueche_power": "sensor.shelly_waschkueche_switch_0_power"
+}
 
-# Google AI Client Setup (Neues SDK)
-if not GOOGLE_API_KEY:
-    print("WARNUNG: GOOGLE_API_KEY fehlt")
-    client = None
-else:
-    # Der neue Client wird einmalig instanziiert
-    client = genai.Client(api_key=GOOGLE_API_KEY)
+# --- HELPER FUNCTIONS ---
 
-# --- DTOs ---
-class QueryRequest(BaseModel):
-    query: str
+def filter_controllable_entities(all_states):
+    """
+    Filtert aus allen ~500 Entitäten die relevanten steuerbaren Geräte heraus.
+    """
+    targets = []
 
-class AIResponse(BaseModel):
-    answer: str
-    context_used: dict
+    # Erlaubte Domains
+    allowed_domains = ["light", "cover", "climate", "switch", "vacuum"]
 
-# --- Helper Functions ---
-async def fetch_ha_context():
-    """Holt Daten von HA (wie gehabt)"""
+    # Blocklist (Rausfiltern von unnötigem Kram)
+    blocklist = [
+        "Internet Access", "Update", "Firmware", "Status", "sensor",
+        "ChildLock", "Reboot", "Identifizieren", "Scene", "Schedule"
+    ]
+
+    for entity in all_states:
+        eid = entity['entity_id']
+        name = entity['attributes'].get('friendly_name', eid)
+        domain = eid.split('.')[0]
+        state = entity['state']
+
+        # 1. Domain Check
+        if domain not in allowed_domains:
+            continue
+
+        # 2. Blocklist Check
+        if any(blocked in name for blocked in blocklist):
+            continue
+
+        # 3. Unavailable Check (optional, um Kontext klein zu halten)
+        if state in ["unavailable", "unknown"]:
+            continue
+
+        # Format: "light.wohnzimmer (Wohnzimmer Decke): on"
+        targets.append(f"{eid} ({name}): {state}")
+
+    return targets
+
+async def get_smart_home_context():
+    """
+    Holt ALLE Daten von HA und bereitet sie in zwei Kategorien auf:
+    1. energy_context (für Logik)
+    2. available_devices (für Tools)
+    """
     if not HA_URL or not HA_TOKEN:
-        return {}
+        return {}, []
 
     headers = {"Authorization": f"Bearer {HA_TOKEN}", "Content-Type": "application/json"}
 
     async with httpx.AsyncClient() as http_client:
         try:
+            # Wir holen ALLES (/api/states) statt nur einzelne Entities
             response = await http_client.get(f"{HA_URL}/api/states", headers=headers, timeout=5.0)
-            if response.status_code != 200: return {}
+            if response.status_code != 200:
+                return {}, []
 
             all_states = response.json()
-            context_data = {}
-            for entity in all_states:
-                if entity['entity_id'] in WATCH_ENTITIES:
-                    context_data[entity['entity_id']] = {
-                        "state": entity['state'],
-                        "name": entity['attributes'].get('friendly_name', entity['entity_id']),
-                        "unit": entity['attributes'].get('unit_of_measurement', '')
-                    }
-                    if entity['entity_id'] == 'sun.sun':
-                        context_data['sun.sun']['next_dawn'] = entity['attributes'].get('next_dawn')
-            return context_data
+
+            # A) Energie-Kontext bauen (Mapping anwenden)
+            energy_context = {}
+            # Hilfs-Dict für schnellen Zugriff per ID
+            state_map = {e['entity_id']: e['state'] for e in all_states}
+
+            for key, entity_id in ENERGY_MAPPING.items():
+                val = state_map.get(entity_id, "N/A")
+                # Versuch, Zahlen direkt als Float zu speichern (hilft der KI beim Rechnen)
+                try:
+                    val = float(val)
+                except:
+                    pass
+                energy_context[key] = val
+
+            # B) Steuerbare Geräte filtern
+            available_devices = filter_controllable_entities(all_states)
+
+            return energy_context, available_devices
+
         except Exception as e:
             print(f"HA Error: {e}")
-            return {}
+            return {}, []
 
-async def execute_ha_service(domain: str, service: str, entity_id: str):
+# --- A. DER ROUTER (KLASSIFIZIERUNG) ---
+async def classify_intent(query: str):
     """
-    Führt eine Aktion in HA aus.
-    z.B. domain="light", service="turn_on", entity_id="light.wohnzimmer"
+    Entscheidet, was der User will. Kostet fast nichts und macht alles stabiler.
     """
-    if not HA_URL or not HA_TOKEN:
-        print("HA Config fehlt.")
-        return False
+    router_prompt = f"""
+    Klassifiziere den User Input in genau eine Kategorie.
+    
+    Kategorien:
+    1. "CONTROL" -> Der User will aktiv etwas schalten (Licht an, Rolladen hoch, Heizung aus).
+    2. "ADVICE"  -> Der User fragt nach Energie-Entscheidungen (Waschmaschine jetzt? Auto laden?).
+                 -> Sätze konnen z.B. mit "Ist gerade guter Zeitpunkt?" beginnen.
+    3. "INFO"    -> Der User will nur Statuswerte wissen (Wie warm ist es? Wieviel Strom verbrauchen wir? Ist Licht im Wohnzimmer an?).
+                 -> Beispiele: 
+                     - Wie warm ist es?
+                     - Wieviel Strom verbrauchen wir?
+                     - Ich möchte das Haus verlassen, was muss ich beachten?
+    
+    Antworte NUR mit dem JSON: {{"intent": "KATEGORIE"}}
+    
+    Input: "{query}"
+    """
+    try:
+        resp = get_client().models.generate_content(
+            model="gemini-2.5-flash-lite",
+            contents=router_prompt,
+            config={"response_mime_type": "application/json"} # Erzwingt JSON
+        )
+        return json.loads(resp.text).get("intent")
+    except:
+        return "FOO" # Fallback
 
-    url = f"{HA_URL}/api/services/{domain}/{service}"
-    headers = {"Authorization": f"Bearer {HA_TOKEN}", "Content-Type": "application/json"}
-    payload = {"entity_id": entity_id}
 
-    print(f"HA ACTION: {domain}.{service} -> {entity_id}")
+async def process_category(category: Category, user_query, energy_data, device_list):
+    # 1. Die richtige Klasse aus dem Dictionary holen
+    handler_class = HANDLER_REGISTRY.get(category)
 
-    async with httpx.AsyncClient() as http_client:
-        try:
-            resp = await http_client.post(url, json=payload, headers=headers, timeout=5.0)
-            return resp.status_code == 200
-        except Exception as e:
-            print(f"HA Action Error: {e}")
-            return False
+    if not handler_class:
+        raise ValueError(f"Kein Handler für {category} definiert!")
 
-# --- Endpoints ---
+    # 2. Instanz erstellen (oder Singleton nutzen) und ausführen
+    handler = handler_class()
+    return await handler.execute(user_query, energy_data, device_list)
 
 @app.get("/health")
 def health_check():
     return {"status": "alive", "sdk": "google-genai-v1"}
 
-@app.post("/api/ask", response_model=AIResponse)
-async def ask_assistant(request: QueryRequest):
-    """Interner Endpunkt (z.B. für Bruno)"""
-    context = await fetch_ha_context()
-
-    system_prompt = f"""
-    Du bist ein Smart Home Assistent.
-    Daten: {json.dumps(context)}
-    Frage: {request.query}
-    Antworte kurz auf Deutsch.
-    """
-
-    try:
-        # NEUE SDK SYNTAX
-        response = client.models.generate_content(
-            model=AI_MODEL_NAME,
-            contents=system_prompt
-        )
-        return AIResponse(answer=response.text, context_used=context)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
-
-# --- ALEXA WEBHOOK MIT SECURITY ---
 @app.post("/alexa-webhook")
 async def handle_alexa(request: Request, token: str = Query(None)):
-    """
-    Der intelligente Webhook mit Function Calling (Tools).
-    """
-    # 1. Security Check
-    current_token = ALEXA_ACCESS_TOKEN or "testAccessToken"
+    # 1. Security
+    current_token = ALEXA_ACCESS_TOKEN
     if token != current_token:
-        print(f"SECURITY ALERT: Invalid token {token}")
-        raise HTTPException(status_code=403, detail="Invalid Access Token")
+        raise HTTPException(status_code=403, detail="Invalid Token")
 
     try:
-        # 2. Payload parsen
         payload = await request.json()
-        # Debugging: Zeig uns im Log, was Alexa schickt
-        # print(f"ALEXA PAYLOAD: {json.dumps(payload)}")
-
         req = payload.get('request', {})
         req_type = req.get('type')
-
-        response_text = "Ich bin mir nicht sicher, was passiert ist."
+        response_text = "Fehler."
         should_end = True
 
-        # --- FALL 1: Session Start ("Öffne Haus") ---
         if req_type == 'LaunchRequest':
-            response_text = "Hallo! Ich bin bereit. Was möchtest du tun?"
-            should_end = False # Session offen lassen
+            response_text = "Hallo! Ich bin bereit."
+            should_end = False
 
-        # --- FALL 2: Benutzer fragt oder befiehlt etwas ---
         elif req_type == 'IntentRequest':
-            intent = req.get('intent', {})
-            slots = intent.get('slots', {})
-            user_query = None
+            user_query = "Nichts"
+            if 'intent' in req and 'slots' in req['intent']:
+                slots = req['intent']['slots']
+                if 'query' in slots and 'value' in slots['query']:
+                    user_query = slots['query']['value']
 
-            # Prüfen ob 'query' Slot existiert
-            if 'query' in slots and 'value' in slots['query']:
-                user_query = slots['query']['value']
+            print(f"USER INPUT: {user_query}")
 
-            if user_query:
-                print(f"USER INPUT: {user_query}")
+            # --- DATEN HOLEN (NEU) ---
+            energy_data, device_list = await get_smart_home_context()
+            print(f"EnergyData: {energy_data}")
+            print(f"DeviceList: {device_list}")
 
-                # Daten holen
-                context = await fetch_ha_context()
-                available_entities = list(context.keys())
+            category = Category[await classify_intent(user_query)]
+            print(f"Category: {category.name}")
 
-                # Prompt bauen
-                system_prompt = f"""
-                Du bist ein Smart Home Assistent.
-                Verfügbare Geräte-IDs (nutze NUR diese für das Tool): {json.dumps(available_entities)}
-                Aktuelle Sensorwerte: {json.dumps(context)}
-                
-                Anweisung:
-                1. Wenn der User etwas schalten will (Licht an/aus), NUTZE das Tool 'control_device'.
-                2. Energie-Beratung: Wenn der User fragt, ob er Großgeräte (Waschmaschine, Spülmaschine, Trockner usw.) nutzen soll:
-                    - Prüfe:
-                        'netz_saldo_watt'. Negativ bedeutet Überschuss/Einspeisung.
-                        'co2_intensität'. Über 300 ist eher unsauber.
-                        'sensor.senec_battery_charge_percent und sensor.senec_battery_state_power'. Nehme 10kWh Akku an, negative Power bedeutet Akku entlädt
-                        Geräte: Spülmaschine rechne 2500W, Waschmaschine rechne 1000W, Trockner rechne 600W.    
-                    - Empfiehl 'JETZT', wenn der Überschuss für den typischen Geräteverbrauch reicht.
-                    - Empfiehl 'WARTEN', wenn kein Überschuss da ist, aber 'pv_rest_prognose_kwh' gute Chancen bietet, das Gerät zu versorgen.
-                    - Empfiehl 'SPÄTER/NACHTS', wenn weder Überschuss noch Prognose gut sind, co2 Intensität gerade nicht sauber ist.
-                    - Empfiehl 'EGAL' wenn alle oberen Bedingungen nicht zutreffen.
-                3. Wenn der User eine Info will, antworte basierend auf den Sensorwerten.
-                4. Antworte immer kurz auf Deutsch: 
-                    - Vollständiger Satz mit maximal 30 Wörtern.
-                    - Keine 'ich prüfe...' Aussagen, immer direkt eine Antwort liefern! 
-                
-                User Input: "{user_query}"
-                """
-
-                try:
-                    # Request an Gemini MIT Tools-Konfiguration
-                    # Wir müssen die Funktions-Definitionen in ein "Tool"-Objekt verpacken
-                    response = client.models.generate_content(
-                        model=AI_MODEL_NAME,
-                        contents=system_prompt,
-                        config={
-                            "tools": [{
-                                "function_declarations": tools_schema
-                            }]
-                        }
-                    )
-
-                    # --- ENTSCHEIDUNG: TEXT ODER TOOL? ---
-                    function_call = None
-
-                    # Wir prüfen die Parts der Antwort (v2 SDK)
-                    if response.candidates and response.candidates[0].content.parts:
-                        for part in response.candidates[0].content.parts:
-                            if part.function_call:
-                                function_call = part.function_call
-                                break
-
-                    if function_call:
-                        # Gemini will schalten!
-                        print(f"TOOL CALL DETECTED: {function_call.name}")
-
-                        fname = function_call.name
-                        args = function_call.args
-
-                        if fname == "control_device":
-                            entity = args.get("entity_id")
-                            action = args.get("action")
-
-                            # Domain extrahieren (z.B. light.x -> light)
-                            if entity and "." in entity:
-                                domain = entity.split('.')[0]
-
-                                # Aktion ausführen
-                                success = await execute_ha_service(domain, action, entity)
-
-                                if success:
-                                    response_text = f"Okay, erledigt. {entity} ist jetzt {action}."
-                                else:
-                                    response_text = f"Fehler: Ich konnte {entity} nicht erreichen."
-                            else:
-                                response_text = "Ich habe keine gültige Geräte-ID gefunden."
-                    else:
-                        # Gemini will nur reden (normale Antwort)
-                        print(f"RESPONSE TEXT: {response.text}")
-
-                    response_text = response.text if response.text else "Ich habe keine Antwort."
-
-                except Exception as ai_error:
-                    print(f"GEMINI ERROR: {ai_error}")
-                    response_text = "Ich konnte mein Gehirn nicht erreichen. Fehler im KI-Modell."
-            else:
-                response_text = "Ich habe das nicht verstanden."
+            response_text = await process_category(category, user_query, energy_data, device_list)
+            print(f"USER OUTPUT: {response_text}")
 
             should_end = True
 
-        # --- FALL 3: Session Ende ---
-        elif req_type == 'SessionEndedRequest':
-            return {"version": "1.0", "response": {}}
-
-        # --- ANTWORT BAUEN ---
         return {
             "version": "1.0",
             "response": {
-                "outputSpeech": {
-                    "type": "PlainText",
-                    "text": response_text
-                },
+                "outputSpeech": {"type": "PlainText", "text": response_text},
                 "shouldEndSession": should_end
             }
         }
 
     except Exception as e:
-        # Notfall-Catch
-        print(f"CRITICAL EXCEPTION: {e}")
-        return {
-            "version": "1.0",
-            "response": {
-                "outputSpeech": {
-                    "type": "PlainText",
-                    "text": "Kritischer Systemfehler. Prüfe die Logs."
-                },
-                "shouldEndSession": True
-            }
-        }
+        print(f"CRITICAL: {e}")
+        return {"version": "1.0", "response": {"outputSpeech": {"type": "PlainText", "text": "Systemfehler."}}}
 
+# --- SERVER START ---
 if __name__ == "__main__":
     import uvicorn
     # Startet den Server auf Port 8000
