@@ -294,9 +294,9 @@ async def handle_alexa(request: Request, token: str = Query(None)):
 
                 # --- DATEN HOLEN (NEU) ---
                 smart_home_context = await get_smart_home_context()
-                print(f"EnergyData: {smart_home_context["energy_context"]}")
-                print(f"DeviceList: {smart_home_context["controllable_devices"]}")
-                print(f"Sensors: {smart_home_context["sensors"]}")
+                print(f"EnergyData: {smart_home_context['energy_context']}")
+                print(f"DeviceList: {smart_home_context['controllable_devices']}")
+                print(f"Sensors: {smart_home_context['sensors']}")
 
                 response_text = await process_category(category, parameters, smart_home_context)
                 print(f"USER OUTPUT: {response_text}")
