@@ -187,19 +187,36 @@ async def handle_alexa(request: Request, token: str = Query(None)):
         intent_name = req.get('intent', {}).get('name')
         response_text = "Fehler."
         should_end = True
-        valid_intents = ["CommandIntent", "QuestionIntent", "StatementIntent"]
+        # 1. Die Konfiguration: Welcher Intent nutzt welchen Slot-Namen?
+        intent_slot_map = {
+            "CommandIntent": "command",     # z.B. "schalte..."
+            "QuestionIntent": "question",   # z.B. "ob..."
+            "StatementIntent": "statement", # z.B. "dass..."
+            "RawInputIntent": "query"       # Dein alter Intent (Fallback)
+        }
 
 
         if req_type == 'LaunchRequest':
             response_text = "Hallo! Ich bin bereit."
             should_end = False
 
-        elif intent_name in valid_intents:
-            user_query = "Nichts"
+        elif intent_name in intent_slot_map:  # <--- Doppelpunkt nicht vergessen!
+            user_query = None # Besser als "Nichts", damit man später filtern kann
+
+            # Sicherstellen, dass 'intent' und 'slots' überhaupt da sind
             if 'intent' in req and 'slots' in req['intent']:
                 slots = req['intent']['slots']
-                if 'query' in slots and 'value' in slots['query']:
-                    user_query = slots['query']['value']
+                target_slot_name = intent_slot_map[intent_name]
+
+                # Sicherer Zugriff: Erst den Slot holen, dann den Value prüfen
+                current_slot = slots.get(target_slot_name)
+
+                if current_slot and 'value' in current_slot:
+                    user_query = current_slot['value']
+
+            # Fallback, falls user_query leer blieb
+            if not user_query:
+                user_query = "Keine Eingabe erkannt"
 
             print(f"USER INPUT: {user_query}")
 
