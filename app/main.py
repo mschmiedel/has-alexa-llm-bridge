@@ -183,14 +183,17 @@ async def handle_alexa(request: Request, token: str = Query(None)):
         payload = await request.json()
         req = payload.get('request', {})
         req_type = req.get('type')
+        intent_name = req.get('intent', {}).get('name')
         response_text = "Fehler."
         should_end = True
+        valid_intents = ["CommandIntent", "QuestionIntent", "StatementIntent"]
+
 
         if req_type == 'LaunchRequest':
             response_text = "Hallo! Ich bin bereit."
             should_end = False
 
-        elif req_type == 'IntentRequest':
+        elif intent_name in valid_intents:
             user_query = "Nichts"
             if 'intent' in req and 'slots' in req['intent']:
                 slots = req['intent']['slots']
