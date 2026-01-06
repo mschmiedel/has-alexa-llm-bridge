@@ -182,6 +182,7 @@ async def handle_alexa(request: Request, token: str = Query(None)):
     try:
         payload = await request.json()
         req = payload.get('request', {})
+        print(f"REQUEST: {req}")
         req_type = req.get('type')
         intent_name = req.get('intent', {}).get('name')
         response_text = "Fehler."
