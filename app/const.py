@@ -6,6 +6,7 @@ load_dotenv()
 
 class Category(Enum):
     ADVICE = auto()
+    LEAVE_HOME = auto()
     CONTROL = auto()
     INFO = auto()
 

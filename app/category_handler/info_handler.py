@@ -7,7 +7,7 @@ from ha_service.main import execute_ha_service
 
 
 class InfoHandler(BaseHandler):
-    async def execute(self, user_query, energy_data, device_list):
+    async def execute(self, parameters, smart_home_context):
         print(f"InfoHandler aufgerufen.")
         # ... hier stehen 100 Zeilen komplexer Code ...
 
@@ -15,8 +15,9 @@ class InfoHandler(BaseHandler):
                 Du bist ein Smart Home Assistent.
                 
                 [KONTEXT]
-                Energie-Werte: {json.dumps(energy_data)}
-                Geräte: {json.dumps(device_list)}
+                Energie-Werte: {json.dumps(smart_home_context.energy_context)}
+                Geräte: {json.dumps(smart_home_context.controllable_devices)}
+                Sensoren: {json.dumps(smart_home_context.sensors)}
                 
                 [ENTSCHEIDUNGS-LOGIK]
                 Analysiere den User Input genau:
@@ -35,7 +36,7 @@ class InfoHandler(BaseHandler):
                 Input: "Gibt es heute noch PV Strom?"
                 Antwort: "Ja, heute kannst Du noch mit 5kWh rechnen, der PV Akku ist bei 100%"
                 
-                Input: "{user_query}"
+                Input: "{parameters}"
                 """
         # --- PROMPT BAUEN ---
 

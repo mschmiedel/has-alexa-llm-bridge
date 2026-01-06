@@ -9,19 +9,19 @@ from const import AI_MODEL_NAME, tools_schema
 
 
 class AdviceHandler(BaseHandler):
-    async def execute(self, user_query, energy_data, device_list):
+    async def execute(self, parameters, smart_home_context):
         global response_text
         print(f"AdviceHandler aufgerufen.")
 
-        print(f"Energie-Werte: {json.dumps(energy_data)}")
+        print(f"Energie-Werte: {json.dumps(smart_home_context["energy_context"])}")
         system_prompt = f"""
             Du bist ein Energieberater aus einem Smart Home.
             
             [KONTEXT]
-            Energie-Werte: {json.dumps(energy_data)}
+            Energie-Werte: {json.dumps(smart_home_context["energy_context"])}
             
             [ENTSCHEIDUNGS-LOGIK]
-            Analysiere den User Input genau:
+            Der User will Beratung über den Zeitpunkt, wann er das genannte Gerät nutzen sollte.
             
             BERATUNG / FRAGE ("Soll ich", "Ist jetzt guter Zeitpunkt")
             Antworte nur mit Text basierend auf diesen Regeln:
@@ -47,16 +47,19 @@ class AdviceHandler(BaseHandler):
                     - ansonsten Empfehle 'EGAL' und liefere kurze Begründung, weshalb es egal ist.
             
             [BEISPIELE - LERNE DARAUS!]
-            Input: "Ist jetzt ein guter Zeitpunkt für die Waschmaschine?"
+            Input: "Device: Waschmaschine"
             Antwort: "Ja, mach an! Wir speisen gerade 2500 Watt ein."
             
-            Input: "Soll ich den Trockner starten?"
+            Input: "Device: Trockner"
             Antwort: "Lieber warten. Aktuell kein Überschuss, aber später kommt Sonne."
             
-            Input: "Gibt es ausreichend PV Strom für Auto laden?"
-            Antwort: "Nein, heute gibt es keinen PV Strom mehr, aber CO2 Intensität ist unter 300g/kWh."
+            Input: "Device: Auto"
+            Antwort: "Es gibt heute keinen PV Strom mehr, aber CO2 Intensität wird um 18:00 niedrig sein."
+
+            Input: "Device: Auto"
+            Antwort: "Es gibt heute keinen PV Strom mehr, und CO2 Intensität wird nicht mehr besser."
             
-            Input: "{user_query}"
+            Input: "{parameters}"
             """
         # --- PROMPT BAUEN ---
 

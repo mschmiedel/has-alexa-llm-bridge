@@ -1,8 +1,13 @@
+import asyncio
 import json
+import traceback
+from zoneinfo import available_timezones
+
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Query
 from dotenv import load_dotenv
 
+from category_handler.leave_home_handler import LeaveHomeHandler
 from genai_client.client import get_client
 from const import Category, ALEXA_ACCESS_TOKEN, HA_URL, HA_TOKEN
 from category_handler.advice_handler import AdviceHandler
@@ -14,6 +19,7 @@ from category_handler.info_handler import InfoHandler
 # Wir mappen Enum -> Klasse
 # ---------------------------------------------------------
 HANDLER_REGISTRY = {
+    Category.LEAVE_HOME: LeaveHomeHandler,
     Category.ADVICE: AdviceHandler,
     Category.CONTROL: ControlHandler,
     Category.INFO: InfoHandler,
@@ -43,25 +49,18 @@ ENERGY_MAPPING = {
 
 # --- HELPER FUNCTIONS ---
 
-def filter_controllable_entities(all_states):
+def filter_entities(all_states, allowed_domains, blocklist):
     """
     Filtert aus allen ~500 Entitäten die relevanten steuerbaren Geräte heraus.
     """
     targets = []
 
-    # Erlaubte Domains
-    allowed_domains = ["light", "cover", "climate", "switch", "vacuum"]
-
-    # Blocklist (Rausfiltern von unnötigem Kram)
-    blocklist = [
-        "Internet Access", "Update", "Firmware", "Status", "sensor",
-        "ChildLock", "Reboot", "Identifizieren", "Scene", "Schedule"
-    ]
-
     for entity in all_states:
         eid = entity['entity_id']
         name = entity['attributes'].get('friendly_name', eid)
+        device_class = entity['attributes'].get('device_class', eid)
         domain = eid.split('.')[0]
+        area = entity['area']
         state = entity['state']
 
         # 1. Domain Check
@@ -76,10 +75,36 @@ def filter_controllable_entities(all_states):
         if state in ["unavailable", "unknown"]:
             continue
 
-        # Format: "light.wohnzimmer (Wohnzimmer Decke): on"
-        targets.append(f"{eid} ({name}): {state}")
+        targets.append({
+            "eid": eid,
+            "name": name,
+            "area": area,
+            "state": f"{state}",
+            "device_class": f"{device_class}"
+        })
 
     return targets
+
+
+async def get_areas(headers):
+    async with httpx.AsyncClient() as http_client_areas:
+
+        headers["Content-Type"]="application/json"
+
+        body = {
+            "template": "{% set ns = namespace(items=[]) %}{% for s in states %}{% set area = area_name(s.entity_id) %}{% if area %}{% set ns.items = ns.items + [(s.entity_id, area)] %}{% endif %}{% endfor %}{{ dict(ns.items) | to_json }}"
+        }
+        try:
+            response = await http_client_areas.post(f"{HA_URL}/api/template", headers=headers, json=body, timeout=5.0)
+            if response.status_code != 200:
+                return {}
+
+            return response.json()
+
+        except Exception as e:
+            print(f"HA Error: {e}")
+            return {}
+
 
 async def get_smart_home_context():
     """
@@ -88,18 +113,33 @@ async def get_smart_home_context():
     2. available_devices (für Tools)
     """
     if not HA_URL or not HA_TOKEN:
-        return {}, []
+        return {
+            "energy_context": {},
+            "controllable_devices": [],
+            "sensors": []
+        }
 
     headers = {"Authorization": f"Bearer {HA_TOKEN}", "Content-Type": "application/json"}
+
+    area_task = asyncio.create_task(get_areas(headers))
 
     async with httpx.AsyncClient() as http_client:
         try:
             # Wir holen ALLES (/api/states) statt nur einzelne Entities
             response = await http_client.get(f"{HA_URL}/api/states", headers=headers, timeout=5.0)
             if response.status_code != 200:
-                return {}, []
+                return {
+                    "energy_context": {},
+                    "controllable_devices": [],
+                    "sensors": []
+                }
 
             all_states = response.json()
+            area_data = await area_task
+            for state in all_states:
+                entity_id = state['entity_id']
+                area = area_data.get(entity_id)
+                state['area'] = area if area else None
 
             # A) Energie-Kontext bauen (Mapping anwenden)
             energy_context = {}
@@ -115,14 +155,38 @@ async def get_smart_home_context():
                     pass
                 energy_context[key] = val
 
-            # B) Steuerbare Geräte filtern
-            available_devices = filter_controllable_entities(all_states)
+            controllable_devices = filter_entities(
+                all_states,
+                ["light", "cover", "climate", "switch", "vacuum"],
+                [
+                    "Internet Access", "Update", "Firmware", "Status", "sensor",
+                    "ChildLock", "Reboot", "Identifizieren", "Scene", "Schedule", "quality", "rssi", "overheat", "overpower"
+                ]
+            )
 
-            return energy_context, available_devices
+            sensors = filter_entities(
+                all_states,
+                ["sensor", "binary_sensor"],
+                [
+                    "Internet Access", "Update", "Firmware", "Status",
+                    "ChildLock", "Reboot", "Identifizieren", "Scene", "Schedule", "quality", "rssi", "overheat", "overpower"
+                ]
+            )
 
+
+            return {
+                "energy_context": energy_context,
+                "controllable_devices": controllable_devices,
+                "sensors": sensors
+            }
         except Exception as e:
             print(f"HA Error: {e}")
-            return {}, []
+            traceback.print_exc()
+            return {
+                "energy_context": {},
+                "controllable_devices": [],
+                "sensors": []
+            }
 
 # --- A. DER ROUTER (KLASSIFIZIERUNG) ---
 async def classify_intent(query: str):
@@ -157,7 +221,7 @@ async def classify_intent(query: str):
         return "FOO" # Fallback
 
 
-async def process_category(category: Category, user_query, energy_data, device_list):
+async def process_category(category: Category, parameters, smart_home_context):
     # 1. Die richtige Klasse aus dem Dictionary holen
     handler_class = HANDLER_REGISTRY.get(category)
 
@@ -166,7 +230,7 @@ async def process_category(category: Category, user_query, energy_data, device_l
 
     # 2. Instanz erstellen (oder Singleton nutzen) und ausführen
     handler = handler_class()
-    return await handler.execute(user_query, energy_data, device_list)
+    return await handler.execute(parameters, smart_home_context)
 
 @app.get("/health")
 def health_check():
@@ -189,10 +253,22 @@ async def handle_alexa(request: Request, token: str = Query(None)):
         should_end = True
         # 1. Die Konfiguration: Welcher Intent nutzt welchen Slot-Namen?
         intent_slot_map = {
-            "CommandIntent": "command",     # z.B. "schalte..."
-            "QuestionIntent": "question",   # z.B. "ob..."
-            "StatementIntent": "statement", # z.B. "dass..."
-            "RawInputIntent": "query"       # Dein alter Intent (Fallback)
+            "LeaveHomeIntent": {
+                "category": Category.LEAVE_HOME,
+                "parameters": []
+            },
+            "EnergyAdviceIntent": {
+                "category": Category.ADVICE,
+                "parameters": ["device"]
+            },
+            "StatusInfoIntent": {
+                "category": Category.INFO,
+                "parameters": ["subject"]
+            },
+            "SmartControlIntent": {
+                "category": Category.CONTROL,
+                "parameters": ["device", "action"]
+            }
         }
 
 
@@ -201,37 +277,35 @@ async def handle_alexa(request: Request, token: str = Query(None)):
             should_end = False
 
         elif intent_name in intent_slot_map:  # <--- Doppelpunkt nicht vergessen!
-            user_query = None # Besser als "Nichts", damit man später filtern kann
+            parameters = []
+            category = None
 
             # Sicherstellen, dass 'intent' und 'slots' überhaupt da sind
-            if 'intent' in req and 'slots' in req['intent']:
-                slots = req['intent']['slots']
-                target_slot_name = intent_slot_map[intent_name]
-
-                # Sicherer Zugriff: Erst den Slot holen, dann den Value prüfen
-                current_slot = slots.get(target_slot_name)
-
-                if current_slot and 'value' in current_slot:
-                    user_query = current_slot['value']
+            if 'intent' in req:
+                category = intent_slot_map[intent_name]['category']
+                if  req['intent']['slots']:
+                    for parameterName in intent_slot_map[intent_name]["parameters"]:
+                        if parameterName in req['intent']['slots']:
+                            parameters.append(req['intent']['slots'][parameterName]['value'])
 
             # Fallback, falls user_query leer blieb
-            if not user_query:
-                user_query = "Keine Eingabe erkannt"
+            if category:
+                print(f"USER INPUT: {category.name}: {parameters} ")
 
-            print(f"USER INPUT: {user_query}")
+                # --- DATEN HOLEN (NEU) ---
+                smart_home_context = await get_smart_home_context()
+                print(f"EnergyData: {smart_home_context["energy_context"]}")
+                print(f"DeviceList: {smart_home_context["controllable_devices"]}")
+                print(f"Sensors: {smart_home_context["sensors"]}")
 
-            # --- DATEN HOLEN (NEU) ---
-            energy_data, device_list = await get_smart_home_context()
-            print(f"EnergyData: {energy_data}")
-            print(f"DeviceList: {device_list}")
+                response_text = await process_category(category, parameters, smart_home_context)
+                print(f"USER OUTPUT: {response_text}")
 
-            category = Category[await classify_intent(user_query)]
-            print(f"Category: {category.name}")
+                should_end = True
 
-            response_text = await process_category(category, user_query, energy_data, device_list)
-            print(f"USER OUTPUT: {response_text}")
-
-            should_end = True
+            else:
+                response_text = "Ich habe Dich nicht verstanden."
+                should_end = True
 
         return {
             "version": "1.0",
@@ -243,7 +317,8 @@ async def handle_alexa(request: Request, token: str = Query(None)):
 
     except Exception as e:
         print(f"CRITICAL: {e}")
-        return {"version": "1.0", "response": {"outputSpeech": {"type": "PlainText", "text": "Systemfehler."}}}
+        traceback.print_exc()
+    return {"version": "1.0", "response": {"outputSpeech": {"type": "PlainText", "text": "Systemfehler."}}}
 
 # --- SERVER START ---
 if __name__ == "__main__":

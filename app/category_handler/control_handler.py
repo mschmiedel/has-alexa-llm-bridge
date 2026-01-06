@@ -7,19 +7,18 @@ from ha_service.main import execute_ha_service
 
 
 class ControlHandler(BaseHandler):
-    async def execute(self, user_query, energy_data, device_list):
+    async def execute(self, parameters, smart_home_context):
         print(f"ControlHandler aufgerufen.")
         system_prompt = f"""
                 Du bist ein Smart Home Assistent.
                 
                 [KONTEXT]
-                Energie-Werte: {json.dumps(energy_data)}
-                Geräte: {json.dumps(device_list)}
+                Geräte: {json.dumps(smart_home_context.controllable_devices)}
                 
                 Anweisung:
                  Wenn der User etwas schalten will (Licht an/aus), NUTZE das Tool 'control_device'.                
                 
-                Input: "{user_query}"
+                Input: "{parameters}"
                 """
         # --- PROMPT BAUEN ---
 
