@@ -296,7 +296,15 @@ async def handle_alexa(request: Request, token: str = Query(None)):
             should_end = True
 
         elif intent_name == "AMAZON.HelpIntent":
-            response_text = "Du kannst sagen: Schalte das Licht an, oder: Wie ist der Status?"
+            response_text = """
+                Um Tips beim Verlassen des Hauses zu bekommen kannst Du sagen: 
+                    Ich/wir verlasse das Haus
+                    Ich/wir gehen jetzt
+                    Ich/wir gehen raus
+                Um Tips zur Nutzung von Geräten zu bekommen kannst Du sagen:
+                    Lohnt sich Auto laden?
+                    Wann soll ich Waschmaschine anmachen?
+            """
             should_end =  False
 
         elif intent_name == "AMAZON.FallbackIntent":
