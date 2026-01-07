@@ -49,11 +49,6 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install ASK CLInp
-        run: |
-          npm install
-          npx ask --version
-
       # Hier nutzen wir die Secrets, um die Config on-the-fly zu bauen
       - name: Configure ASK CLI
         env:
@@ -79,7 +74,7 @@ jobs:
                  refresh_token: $rt,
                  token_type: "bearer",
                  expires_in: 3600,
-                 expires_at: 0
+                 expires_at: "2020-01-01T00:00:00.000Z"
                },
                aws_profile: "__ua__",
                alexa_developer_client_id: $cid,
