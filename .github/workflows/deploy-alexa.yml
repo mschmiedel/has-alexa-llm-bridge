@@ -55,30 +55,35 @@ jobs:
           npx ask --version
 
       # Hier nutzen wir die Secrets, um die Config on-the-fly zu bauen
-      - name: Configure ASK CLI Credentials
+      - name: Configure ASK CLI
         env:
+          ASK_REFRESH_TOKEN: ${{ secrets.ASK_REFRESH_TOKEN }}
           ASK_CLIENT_ID: ${{ secrets.ASK_CLIENT_ID }}
           ASK_CLIENT_SECRET: ${{ secrets.ASK_CLIENT_SECRET }}
-          ASK_REFRESH_TOKEN: ${{ secrets.ASK_REFRESH_TOKEN }}
         run: |
-          # Wir bauen die JSON Config, die ask-cli erwartet
           mkdir -p ~/.ask
-          echo "{
-            \"profiles\": {
-              \"default\": {
-                \"token\": {
-                  \"access_token\": \"UNUSED\",
-                  \"refresh_token\": \"$ASK_REFRESH_TOKEN\",
-                  \"token_type\": \"bearer\",
-                  \"expires_in\": 3600,
-                  \"expires_at\": 0
-                },
-                \"aws_profile\": \"__ua\",
-                \"alexa_developer_client_id\": \"$ASK_CLIENT_ID\",
-                \"alexa_developer_client_secret\": \"$ASK_CLIENT_SECRET\"
-              }
-            }
-          }" > ~/.ask/cli_config
+          
+          # Wir nutzen jq, um das JSON sicher zu bauen
+          jq -n \
+          --arg rt "$ASK_REFRESH_TOKEN" \
+          --arg cid "$ASK_CLIENT_ID" \
+          --arg cs "$ASK_CLIENT_SECRET" \
+          '{
+           profiles: {
+             default: {
+               token: {
+                 access_token: "UNUSED",
+                 refresh_token: $rt,
+                 token_type: "bearer",
+                 expires_in: 3600,
+                 expires_at: 0
+               },
+               aws_profile: "__ua__",
+               alexa_developer_client_id: $cid,
+               alexa_developer_client_secret: $cs
+             }
+           }
+          }' > ~/.ask/cli_config
 
       - name: Deploy Model via SMAPI
         env:
