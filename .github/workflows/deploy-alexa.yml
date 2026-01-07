@@ -49,6 +49,11 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install ASK CLInp
+        run: |
+          npm install
+          npx ask --version
+
       # Hier nutzen wir die Secrets, um die Config on-the-fly zu bauen
       - name: Configure ASK CLI
         env:
@@ -83,11 +88,6 @@ jobs:
              }
            }
           }' > ~/.ask/cli_config
-
-      - name: Debug Auth
-        run: |
-          echo "Versuche Access Token zu holen..."
-          npx ask token
 
       - name: Deploy Model via SMAPI
         env:
