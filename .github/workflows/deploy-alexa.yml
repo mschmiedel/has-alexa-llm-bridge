@@ -90,6 +90,7 @@ jobs:
             -g development \
             -l de-DE \
             --interaction-model "file:./alexa_model.json"
+            --debug
 
       - name: Check Build Status (Optional)
         env:
