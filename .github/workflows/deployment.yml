@@ -1,0 +1,132 @@
+name: Docker Build & Publish
+
+on:
+  push:
+    branches: [ "main" ]
+    # Veröffentlicht Tags als vX.Y.Z
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  REGISTRY: ghcr.io
+  # github.repository ist "dein-user/repo-name"
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # Wichtig für GHCR Zugriff
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 1. Quality Gate (Linter)
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install Dev Dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run Ruff (Linter)
+        run: ruff check .
+
+      # Login bei der Container Registry
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Extrahiert Metadaten (Tags, Labels) für Docker
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,format=long
+
+      # Bauen und Pushen
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # ----------------------------------------------------------------
+  # JOB 2: Alexa Interaction Model Deployen
+  # ----------------------------------------------------------------
+  deploy-alexa-model:
+    name: Deploy Alexa JSON
+    runs-on: ubuntu-latest
+    # WICHTIG: Dieser Job läuft NUR, wenn die JSON-Datei geändert wurde!
+    # Spart Zeit und verhindert unnötige Deployments.
+    if: contains(github.event.head_commit.modified, 'alexa_model.json') || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Wir brauchen Node.js für die ASK CLI
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install ASK CLInp
+        run: npm install -g ask-cli
+
+      # Hier nutzen wir die Secrets, um die Config on-the-fly zu bauen
+      - name: Configure ASK CLI Credentials
+        env:
+          ASK_CLIENT_ID: ${{ secrets.ASK_CLIENT_ID }}
+          ASK_CLIENT_SECRET: ${{ secrets.ASK_CLIENT_SECRET }}
+          ASK_REFRESH_TOKEN: ${{ secrets.ASK_REFRESH_TOKEN }}
+        run: |
+          # Wir bauen die JSON Config, die ask-cli erwartet
+          mkdir -p ~/.ask
+          echo "{
+            \"profiles\": {
+              \"default\": {
+                \"token\": {
+                  \"access_token\": \"UNUSED\",
+                  \"refresh_token\": \"$ASK_REFRESH_TOKEN\",
+                  \"token_type\": \"bearer\",
+                  \"expires_in\": 3600,
+                  \"expires_at\": 0
+                },
+                \"aws_profile\": \"__ua\",
+                \"alexa_developer_client_id\": \"$ASK_CLIENT_ID\",
+                \"alexa_developer_client_secret\": \"$ASK_CLIENT_SECRET\"
+              }
+            }
+          }" > ~/.ask/cli_config
+
+      - name: Deploy Model via SMAPI
+        env:
+          SKILL_ID: ${{ secrets.ALEXA_SKILL_ID }}
+        run: |
+          echo "Deploying Interaction Model for Skill $SKILL_ID..."
+          ask smapi put-interaction-model \
+            --skill-id $SKILL_ID \
+            --stage development \
+            --locale de-DE \
+            --interaction-model file:alexa_model.json
+
+      - name: Check Build Status (Optional)
+        env:
+          SKILL_ID: ${{ secrets.ALEXA_SKILL_ID }}
+        run: |
+          # Fragt den Status ab, um zu sehen, ob das Modell valide war
+          ask smapi get-skill-status --skill-id $SKILL_ID --resource manifest

@@ -1,0 +1,177 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "schlaue zentrale",
+      "intents": [
+        {
+          "name": "LeaveHomeIntent",
+          "slots": [],
+          "samples": [
+            "ich verlasse das haus",
+            "wir gehen jetzt",
+            "ich gehe raus",
+            "wir sind dann mal weg",
+            "tschüss bis später"
+          ]
+        },
+        {
+          "name": "SmartControlIntent",
+          "slots": [
+            {
+              "name": "action",
+              "type": "ActionType"
+            },
+            {
+              "name": "device",
+              "type": "EnergyDeviceType"
+            }
+          ],
+          "samples": [
+            "bitte {action} das {device}",
+            "sorge dafür dass {device} {action} wird",
+            "{action} bitte den {device}",
+            "{action} {device}"
+          ]
+        },
+        {
+          "name": "EnergyAdviceIntent",
+          "slots": [
+            {
+              "name": "device",
+              "type": "EnergyDeviceType"
+            }
+          ],
+          "samples": [
+            "wann soll ich {device} anschalten",
+            "lohnt sich {device}"
+          ]
+        },
+        {
+          "name": "StatusInfoIntent",
+          "slots": [
+            {
+              "name": "subject",
+              "type": "InfoSubjectType"
+            }
+          ],
+          "samples": [
+            "wie ist der status von {subject}",
+            "sind {subject} offen"
+          ]
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        }
+      ],
+      "types": [
+        {
+          "name": "EnergyDeviceType",
+          "values": [
+            {
+              "name": {
+                "value": "Waschmaschine"
+              }
+            },
+            {
+              "name": {
+                "value": "Spülmaschine"
+              }
+            },
+            {
+              "name": {
+                "value": "Trockner"
+              }
+            },
+            {
+              "name": {
+                "value": "Auto"
+              }
+            },
+            {
+              "name": {
+                "value": "Heizung"
+              }
+            },
+            {
+              "name": {
+                "value": "Abwesenheitsmodus",
+                "synonyms": [
+                  "Urlaubsmodus",
+                  "Sparmodus"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ActionType",
+          "values": [
+            {
+              "name": {
+                "value": "verlassen"
+              }
+            },
+            {
+              "name": {
+                "value": "aktivieren",
+                "synonyms": [
+                  "einschalten",
+                  "anmachen",
+                  "starten"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "deaktivieren",
+                "synonyms": [
+                  "ausschalten",
+                  "ausmachen",
+                  "stoppen"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "laden"
+              }
+            }
+          ]
+        },
+        {
+          "name": "InfoSubjectType",
+          "values": [
+            {
+              "name": {
+                "value": "Strom"
+              }
+            },
+            {
+              "name": {
+                "value": "Fenster"
+              }
+            },
+            {
+              "name": {
+                "value": "Prognose"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
