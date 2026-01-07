@@ -1,5 +1,5 @@
 # Schlankes Base-Image
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Umgebungsvariablen setzen
 # PYTHONDONTWRITEBYTECODE: Verhindert .pyc Dateien

@@ -13,7 +13,7 @@ class AdviceHandler(BaseHandler):
         global response_text
         print(f"AdviceHandler aufgerufen.")
 
-        print(f"Energie-Werte: {json.dumps(smart_home_context["energy_context"])}")
+        print(f"Energie-Werte: {json.dumps(smart_home_context['energy_context'])}")
         system_prompt = f"""
             Du bist ein Energieberater aus einem Smart Home.
             
