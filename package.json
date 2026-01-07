@@ -1,5 +1,5 @@
 {
-  "dependencies": {
+  "devDependencies": {
     "ask-cli": "^2.30.7"
   }
 }

@@ -52,7 +52,7 @@ jobs:
       - name: Install ASK CLInp
         run: |
           npm install
-          ask --version
+          npx ask --version
 
       # Hier nutzen wir die Secrets, um die Config on-the-fly zu bauen
       - name: Configure ASK CLI Credentials
@@ -85,7 +85,7 @@ jobs:
           SKILL_ID: ${{ secrets.ALEXA_SKILL_ID }}
         run: |
           echo "Deploying Interaction Model for Skill $SKILL_ID..."
-          ask smapi put-interaction-model \
+          npx ask smapi put-interaction-model \
             --skill-id $SKILL_ID \
             --stage development \
             --locale de-DE \
@@ -96,4 +96,4 @@ jobs:
           SKILL_ID: ${{ secrets.ALEXA_SKILL_ID }}
         run: |
           # Fragt den Status ab, um zu sehen, ob das Modell valide war
-          ask smapi get-skill-status --skill-id $SKILL_ID --resource manifest
+          npx ask smapi get-skill-status --skill-id $SKILL_ID --resource manifest
