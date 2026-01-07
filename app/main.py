@@ -283,7 +283,7 @@ async def handle_alexa(request: Request, token: str = Query(None)):
             # Sicherstellen, dass 'intent' und 'slots' überhaupt da sind
             if 'intent' in req:
                 category = intent_slot_map[intent_name]['category']
-                if  req['intent']['slots']:
+                if  req['intent'].get('slots', {}):
                     for parameterName in intent_slot_map[intent_name]["parameters"]:
                         if parameterName in req['intent']['slots']:
                             parameters.append(req['intent']['slots'][parameterName]['value'])
