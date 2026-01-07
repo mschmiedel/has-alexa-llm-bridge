@@ -85,11 +85,11 @@ jobs:
           SKILL_ID: ${{ secrets.ALEXA_SKILL_ID }}
         run: |
           echo "Deploying Interaction Model for Skill $SKILL_ID..."
-          npx ask smapi put-interaction-model \
-            --skill-id $SKILL_ID \
-            --stage development \
-            --locale de-DE \
-            --interaction-model file:alexa_model.json
+          npx ask smapi update-interaction-model \
+            -s $SKILL_ID \
+            -g development \
+            -l de-DE \
+            --interaction-model-file ./alexa_model.json
 
       - name: Check Build Status (Optional)
         env:
