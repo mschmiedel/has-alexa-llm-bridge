@@ -1,0 +1,2 @@
+# Wir sagen dem Linter: "Tu so, als ob wir auf Python 3.11 sind"
+target-version = "py312"
