@@ -291,6 +291,18 @@ async def handle_alexa(request: Request, token: str = Query(None)):
             response_text = "Hallo! Ich bin bereit."
             should_end = False
 
+        elif intent_name == "AMAZON.StopIntent" or intent_name == "AMAZON.CancelIntent":
+            response_text = "Tschüss!"
+            should_end = True
+
+        elif intent_name == "AMAZON.HelpIntent":
+            response_text = "Du kannst sagen: Schalte das Licht an, oder: Wie ist der Status?"
+            should_end =  False
+
+        elif intent_name == "AMAZON.FallbackIntent":
+            response_text = "Das habe ich leider nicht verstanden."
+            should_end = False
+
         elif intent_name in intent_slot_map:  # <--- Doppelpunkt nicht vergessen!
             parameters = []
             category = None
