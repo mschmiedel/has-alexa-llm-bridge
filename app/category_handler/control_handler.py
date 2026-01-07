@@ -26,7 +26,7 @@ class ControlHandler(BaseHandler):
             response = get_client().models.generate_content(
                 model=AI_MODEL_NAME,
                 contents=system_prompt,
-                config={"tools": [{"function_declarations": tools_schema}]}
+                config={"tools": [{"function_declarations": tools_schema}]},
             )
 
             # Tool Call Check (v2 SDK Style)
@@ -39,7 +39,7 @@ class ControlHandler(BaseHandler):
                         if fc.name == "control_device":
                             eid = fc.args.get("entity_id")
                             act = fc.args.get("action")
-                            dom = eid.split('.')[0] if "." in eid else ""
+                            dom = eid.split(".")[0] if "." in eid else ""
                             if await execute_ha_service(dom, act, eid):
                                 response_text = f"Okay, {act} für {eid} ausgeführt."
                             else:

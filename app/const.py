@@ -4,11 +4,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class Category(Enum):
     ADVICE = auto()
     LEAVE_HOME = auto()
     CONTROL = auto()
     INFO = auto()
+
 
 tools_schema = [
     {
@@ -19,16 +21,16 @@ tools_schema = [
             "properties": {
                 "entity_id": {
                     "type": "STRING",
-                    "description": "Die ID des Geräts, z.B. light.wohnzimmer"
+                    "description": "Die ID des Geräts, z.B. light.wohnzimmer",
                 },
                 "action": {
                     "type": "STRING",
                     "description": "Die Aktion: 'turn_on' oder 'turn_off'",
-                    "enum": ["turn_on", "turn_off"]
-                }
+                    "enum": ["turn_on", "turn_off"],
+                },
             },
-            "required": ["entity_id", "action"]
-        }
+            "required": ["entity_id", "action"],
+        },
     }
 ]
 

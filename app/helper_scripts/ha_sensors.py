@@ -33,16 +33,16 @@ try:
     # Wir filtern und sortieren gleich, damit es lesbar ist
     with open("ha_sensors.txt", "w", encoding="utf-8") as f:
         # Sortiert nach Domain (z.B. light, sensor)
-        sorted_entities = sorted(data, key=lambda x: x['entity_id'])
+        sorted_entities = sorted(data, key=lambda x: x["entity_id"])
 
         for entity in sorted_entities:
-            eid = entity['entity_id']
+            eid = entity["entity_id"]
             # Optional: Filtern, wenn du z.B. nur Sensoren willst
             # if not eid.startswith(("sensor.", "binary_sensor.")): continue
 
-            name = entity['attributes'].get('friendly_name', 'Unbenannt')
-            unit = entity['attributes'].get('unit_of_measurement', '')
-            state = entity['state']
+            name = entity["attributes"].get("friendly_name", "Unbenannt")
+            unit = entity["attributes"].get("unit_of_measurement", "")
+            state = entity["state"]
 
             # Format: domain.name | "Freundlicher Name" | Aktueller Wert
             line = f"{eid} | {name} | {state} {unit}"

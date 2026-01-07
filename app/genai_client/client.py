@@ -15,6 +15,7 @@ api_key = os.getenv("GOOGLE_API_KEY")
 # 3. Interne Variable für das Singleton
 _client_instance = None
 
+
 def get_client():
     """
     Gibt die Client-Instanz zurück (Lazy Singleton).

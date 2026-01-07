@@ -12,6 +12,7 @@ class LeaveHomeHandler(BaseHandler):
     async def execute(self, parameters, smart_home_context):
         global response_text
         print(f"LeaveHomeHandler aufgerufen.")
+
         # Hilfsfunktion für sichere Float-Umwandlung (verhindert Crash bei "unavailable" etc.)
         def safe_float(value):
             try:
@@ -23,8 +24,7 @@ class LeaveHomeHandler(BaseHandler):
         aktive_lichter = [
             {"eid": d["eid"], "area": d["area"], "state": d["state"]}
             for d in smart_home_context.get("controllable_devices", [])
-            if d.get("device_class", "").startswith("light")
-               and d.get("state") != "off"
+            if d.get("device_class", "").startswith("light") and d.get("state") != "off"
         ]
 
         # 2. Offene Fenster/Türen (Nur eid, area, state)
@@ -33,8 +33,8 @@ class LeaveHomeHandler(BaseHandler):
             {"eid": d["eid"], "area": d["area"], "state": d["state"]}
             for d in smart_home_context.get("sensors", [])
             if d.get("area")
-               and d.get("device_class") in ["window", "door"]
-               and d.get("state") not in ["off", "closed"]
+            and d.get("device_class") in ["window", "door"]
+            and d.get("state") not in ["off", "closed"]
         ]
 
         # 3. Hoher Verbrauch (Nur eid, area, state)
@@ -42,9 +42,9 @@ class LeaveHomeHandler(BaseHandler):
             {"eid": d["eid"], "area": d["area"], "state": d["state"]}
             for d in smart_home_context.get("sensors", [])
             if d.get("area")
-               and d.get("area") not in ["Wärmepumpe"] # Ausschlussliste
-               and d.get("device_class") == "power"
-               and safe_float(d.get("state")) > 500
+            and d.get("area") not in ["Wärmepumpe"]  # Ausschlussliste
+            and d.get("device_class") == "power"
+            and safe_float(d.get("state")) > 500
         ]
 
         # --- Debug Ausgabe ---
@@ -71,7 +71,7 @@ class LeaveHomeHandler(BaseHandler):
             response = get_client().models.generate_content(
                 model=AI_MODEL_NAME,
                 contents=system_prompt,
-                config={"tools": [{"function_declarations": tools_schema}]}
+                config={"tools": [{"function_declarations": tools_schema}]},
             )
 
             # Tool Call Check (v2 SDK Style)
@@ -84,7 +84,7 @@ class LeaveHomeHandler(BaseHandler):
                         if fc.name == "control_device":
                             eid = fc.args.get("entity_id")
                             act = fc.args.get("action")
-                            dom = eid.split('.')[0] if "." in eid else ""
+                            dom = eid.split(".")[0] if "." in eid else ""
                             if await execute_ha_service(dom, act, eid):
                                 response_text = f"Okay, {act} für {eid} ausgeführt."
                             else:
