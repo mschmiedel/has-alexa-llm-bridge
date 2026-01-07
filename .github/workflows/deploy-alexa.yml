@@ -89,6 +89,11 @@ jobs:
            }
           }' > ~/.ask/cli_config
 
+      - name: Debug Auth
+        run: |
+          echo "Versuche Access Token zu holen..."
+          npx ask token
+
       - name: Deploy Model via SMAPI
         env:
           SKILL_ID: ${{ secrets.ALEXA_SKILL_ID }}
