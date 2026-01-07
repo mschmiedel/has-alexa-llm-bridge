@@ -8,7 +8,7 @@ from ha_service.main import execute_ha_service
 
 class InfoHandler(BaseHandler):
     async def execute(self, parameters, smart_home_context):
-        print(f"InfoHandler aufgerufen.")
+        print("InfoHandler aufgerufen.")
         # ... hier stehen 100 Zeilen komplexer Code ...
 
         system_prompt = f"""

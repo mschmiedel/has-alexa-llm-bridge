@@ -11,7 +11,7 @@ from const import AI_MODEL_NAME, tools_schema
 class AdviceHandler(BaseHandler):
     async def execute(self, parameters, smart_home_context):
         global response_text
-        print(f"AdviceHandler aufgerufen.")
+        print("AdviceHandler aufgerufen.")
 
         print(f"Energie-Werte: {json.dumps(smart_home_context['energy_context'])}")
         system_prompt = f"""

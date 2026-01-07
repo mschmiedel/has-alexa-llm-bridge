@@ -1,7 +1,6 @@
 import asyncio
 import json
 import traceback
-from zoneinfo import available_timezones
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Query
@@ -27,7 +26,7 @@ HANDLER_REGISTRY = {
 # 1. Config & Setup
 load_dotenv()
 
-print(f"HA_URL:", HA_URL)
+print(f"HA_URL: {HA_URL}")
 
 app = FastAPI(title="Smart Home AI")
 
@@ -152,7 +151,7 @@ async def get_smart_home_context():
                 # Versuch, Zahlen direkt als Float zu speichern (hilft der KI beim Rechnen)
                 try:
                     val = float(val)
-                except:
+                except Exception:
                     pass
                 energy_context[key] = val
 
@@ -237,7 +236,8 @@ async def classify_intent(query: str):
             config={"response_mime_type": "application/json"},  # Erzwingt JSON
         )
         return json.loads(resp.text).get("intent")
-    except:
+    except Exception:
+        traceback.print_exc()
         return "FOO"  # Fallback
 
 

@@ -11,7 +11,7 @@ from const import AI_MODEL_NAME, tools_schema
 class LeaveHomeHandler(BaseHandler):
     async def execute(self, parameters, smart_home_context):
         global response_text
-        print(f"LeaveHomeHandler aufgerufen.")
+        print("LeaveHomeHandler aufgerufen.")
 
         # Hilfsfunktion für sichere Float-Umwandlung (verhindert Crash bei "unavailable" etc.)
         def safe_float(value):

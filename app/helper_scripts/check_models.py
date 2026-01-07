@@ -1,5 +1,4 @@
 # check_models.py
-import os
 from dotenv import load_dotenv
 
 from genai_client.client import get_client

@@ -8,7 +8,7 @@ from ha_service.main import execute_ha_service
 
 class ControlHandler(BaseHandler):
     async def execute(self, parameters, smart_home_context):
-        print(f"ControlHandler aufgerufen.")
+        print("ControlHandler aufgerufen.")
         system_prompt = f"""
                 Du bist ein Smart Home Assistent.
                 
