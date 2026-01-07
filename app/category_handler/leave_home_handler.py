@@ -63,7 +63,7 @@ class LeaveHomeHandler(BaseHandler):
             [REGELN]
             - Wenn alles "Keine/Kein" ist, sag nur: "Alles sicher, schönen Tag!"
             - Erwähne NUR die Dinge, die NICHT "Keine" sind, je einen Satz für jede Liste.
-            - In jedem Satz, erwähne jeden betroffenen Bereich und seine Anzahl an betroffenen Dingen.
+            - In jedem Satz, erwähne jeden betroffenen Bereich(area) und seine Anzahl an betroffenen Dingen.
         """
         # --- PROMPT BAUEN ---
 
