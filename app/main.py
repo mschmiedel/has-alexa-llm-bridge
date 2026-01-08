@@ -1,6 +1,7 @@
 import asyncio
 import json
 import traceback
+from datetime import datetime, timedelta
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Query
@@ -46,8 +47,17 @@ ENERGY_MAPPING = {
     "waschkueche_power": "sensor.shelly_waschkueche_switch_0_power",
 }
 
-# --- HELPER FUNCTIONS ---
+HISTORY_MAPPING = {
+    "Wallbox": "sensor.senec_webapi_v3_wallbox_consumption_total",
+    "Akku_Geladen": "sensor.senec_webapi_v3_accuexport_total",
+    "Akku_Entladen": "sensor.senec_webapi_v3_accuimport_total",
+    "PV_Erzeugung_Gesamt": "sensor.senec_webapi_v3_powergenerated_total",
+    "Waschkueche_Gesamt": "sensor.shelly_waschkueche_switch_0_energy",
+    "Waermepumpe_Gesamt": "sensor.shelly_ac_em1_total_active_energy",
+    "Hausverbrauch_Gesamt": "sensor.senec_webapi_v3_consumption_total",
+}
 
+# --- HELPER FUNCTIONS ---
 
 def filter_entities(all_states, allowed_domains, blocklist):
     """
@@ -91,7 +101,6 @@ def filter_entities(all_states, allowed_domains, blocklist):
 async def get_areas(headers):
     async with httpx.AsyncClient() as http_client_areas:
         headers["Content-Type"] = "application/json"
-
         body = {
             "template": "{% set ns = namespace(items=[]) %}{% for s in states %}{% set area = area_name(s.entity_id) %}{% if area %}{% set ns.items = ns.items + [(s.entity_id, area)] %}{% endif %}{% endfor %}{{ dict(ns.items) | to_json }}"
         }
@@ -101,22 +110,49 @@ async def get_areas(headers):
             )
             if response.status_code != 200:
                 return {}
-
             return response.json()
-
         except Exception as e:
             print(f"HA Error: {e}")
             return {}
 
 
+async def fetch_history_point(client, entity_id, timestamp, headers):
+    """
+    Holt den Status einer Entity zu einem exakten Zeitpunkt in der Vergangenheit.
+    """
+    try:
+        ts_str = timestamp.isoformat()
+        # Kleines Zeitfenster definieren (1 Sekunde reicht)
+        end_str = (timestamp + timedelta(seconds=1)).isoformat()
+
+        url = f"{HA_URL}/api/history/period/{ts_str}"
+        params = {
+            "filter_entity_id": entity_id,
+            "end_time": end_str,
+            "minimal_response": "true"
+        }
+
+        response = await client.get(url, headers=headers, params=params, timeout=5.0)
+
+        if response.status_code == 200:
+            data = response.json()
+            # Struktur ist [[{state...}]]. Wir nehmen den ersten Eintrag.
+            if data and len(data) > 0 and len(data[0]) > 0:
+                val = data[0][0].get("state")
+                try:
+                    return float(val)
+                except (ValueError, TypeError):
+                    return None
+        return None
+    except Exception:
+        return None
+
 async def get_smart_home_context():
     """
-    Holt ALLE Daten von HA und bereitet sie in zwei Kategorien auf:
-    1. energy_context (für Logik)
-    2. available_devices (für Tools)
+    Holt ALLE Daten von HA und bereitet sie auf.
     """
     if not HA_URL or not HA_TOKEN:
-        return {"energy_context": {}, "controllable_devices": [], "sensors": []}
+        return {"energy_context": {}, "energy_history": {}, "controllable_devices": [], "sensors": []}
 
     headers = {
         "Authorization": f"Bearer {HA_TOKEN}",
@@ -127,91 +163,114 @@ async def get_smart_home_context():
 
     async with httpx.AsyncClient() as http_client:
         try:
-            # Wir holen ALLES (/api/states) statt nur einzelne Entities
+            # 1. Aktuelle States holen (für Live Context & aktuelle Zählerstände)
             response = await http_client.get(
                 f"{HA_URL}/api/states", headers=headers, timeout=5.0
             )
-            if response.status_code != 200:
-                return {"energy_context": {}, "controllable_devices": [], "sensors": []}
 
-            all_states = response.json()
-            area_data = await area_task
-            for state in all_states:
-                entity_id = state["entity_id"]
-                area = area_data.get(entity_id)
-                state["area"] = area if area else None
-
-            # A) Energie-Kontext bauen (Mapping anwenden)
+            controllable_devices = []
+            sensors = []
             energy_context = {}
-            # Hilfs-Dict für schnellen Zugriff per ID
-            state_map = {e["entity_id"]: e["state"] for e in all_states}
+            energy_history = {}
+            state_map = {} # Cache für schnellen Zugriff
 
-            for key, entity_id in ENERGY_MAPPING.items():
-                val = state_map.get(entity_id, "N/A")
-                # Versuch, Zahlen direkt als Float zu speichern (hilft der KI beim Rechnen)
-                try:
-                    val = float(val)
-                except Exception:
-                    pass
-                energy_context[key] = val
+            if response.status_code == 200:
+                all_states = response.json()
+                area_data = await area_task
 
-            controllable_devices = filter_entities(
-                all_states,
-                ["light", "cover", "climate", "switch", "vacuum"],
-                [
-                    "Internet Access",
-                    "Update",
-                    "Firmware",
-                    "Status",
-                    "sensor",
-                    "ChildLock",
-                    "Reboot",
-                    "Identifizieren",
-                    "Scene",
-                    "Schedule",
-                    "quality",
-                    "rssi",
-                    "overheat",
-                    "overpower",
-                ],
-            )
+                # State Map aufbauen
+                for state in all_states:
+                    entity_id = state["entity_id"]
+                    state["area"] = area_data.get(entity_id)
 
-            sensors = filter_entities(
-                all_states,
-                ["sensor", "binary_sensor"],
-                [
-                    "Internet Access",
-                    "Update",
-                    "Firmware",
-                    "Status",
-                    "ChildLock",
-                    "Reboot",
-                    "Identifizieren",
-                    "Scene",
-                    "Schedule",
-                    "quality",
-                    "rssi",
-                    "overheat",
-                    "overpower",
-                ],
-            )
+                    try:
+                        val = float(state["state"])
+                    except Exception:
+                        val = state["state"]
+                    state_map[entity_id] = val
+
+                controllable_devices = filter_entities(
+                    all_states, ["light", "cover", "climate", "switch", "vacuum"],
+                    ["Internet Access", "Update", "Firmware", "Status", "sensor", "ChildLock", "Reboot", "Identifizieren", "Scene", "Schedule", "quality", "rssi", "overheat", "overpower"]
+                )
+                sensors = filter_entities(
+                    all_states, ["sensor", "binary_sensor"],
+                    ["Internet Access", "Update", "Firmware", "Status", "ChildLock", "Reboot", "Identifizieren", "Scene", "Schedule", "quality", "rssi", "overheat", "overpower"]
+                )
+
+                # --- 2. ENERGY CONTEXT (LIVE) ---
+                for key, entity_id in ENERGY_MAPPING.items():
+                    val = state_map.get(entity_id, "N/A")
+                    energy_context[key] = val
+
+                # --- 3. ENERGY HISTORY (Vergangenheit) ---
+                now = datetime.now()
+                history_tasks = []
+                task_map = []
+
+                # Wir iterieren über das HISTORY MAPPING
+                for key, entity_id in HISTORY_MAPPING.items():
+                    # 7 Tage zurück
+                    for day in range(1, 8):
+                        ts = now - timedelta(days=day)
+                        history_tasks.append(fetch_history_point(http_client, entity_id, ts, headers))
+                        task_map.append((key, day))
+
+                # Alle History-Calls parallel abfeuern
+                if history_tasks:
+                    history_results = await asyncio.gather(*history_tasks)
+
+                    # Temporäre Struktur für Rohdaten
+                    raw_history = {k: [] for k in HISTORY_MAPPING.keys()}
+
+                    # Ergebnisse einsortieren
+                    for i, res in enumerate(history_results):
+                        key, day = task_map[i]
+                        raw_history[key].append(res)
+
+                    # Differenzen berechnen
+                    for key, past_vals in raw_history.items():
+                        entity_id = HISTORY_MAPPING[key]
+
+                        # Aktueller Zählerstand als Startpunkt
+                        current_total = state_map.get(entity_id)
+
+                        # Fallback, falls aktueller Wert fehlt
+                        if not isinstance(current_total, (int, float)):
+                            energy_history[key] = []
+                            continue
+
+                        diffs = []
+                        last_val = current_total
+
+                        # past_vals ist [Wert_Gestern, Wert_Vorgestern...]
+                        for val_past in past_vals:
+                            if last_val is not None and val_past is not None:
+                                # Verbrauch = Wert(Neu) - Wert(Alt)
+                                diff = last_val - val_past
+                                # Negative Diffs abfangen (z.B. Zählertausch), sonst runden
+                                diffs.append(round(max(0.0, diff), 2))
+                            else:
+                                diffs.append(None)
+
+                            # Referenz für nächsten Tag verschieben
+                            last_val = val_past
+
+                        energy_history[key] = diffs
 
             return {
                 "energy_context": energy_context,
+                "energy_history": energy_history,
                 "controllable_devices": controllable_devices,
                 "sensors": sensors,
             }
         except Exception as e:
             print(f"HA Error: {e}")
             traceback.print_exc()
-            return {"energy_context": {}, "controllable_devices": [], "sensors": []}
-
+            return {"energy_context": {}, "energy_history": {}, "controllable_devices": [], "sensors": []}
 
 # --- A. DER ROUTER (KLASSIFIZIERUNG) ---
 async def classify_intent(query: str):
-    """
-    Entscheidet, was der User will. Kostet fast nichts und macht alles stabiler.
-    """
     router_prompt = f"""
     Klassifiziere den User Input in genau eine Kategorie.
     
@@ -332,8 +391,9 @@ async def handle_alexa(request: Request, token: str = Query(None)):
                 # --- DATEN HOLEN (NEU) ---
                 smart_home_context = await get_smart_home_context()
                 print(f"EnergyData: {smart_home_context['energy_context']}")
-                print(f"DeviceList: {smart_home_context['controllable_devices']}")
-                print(f"Sensors: {smart_home_context['sensors']}")
+                print(f"EnergyData: {smart_home_context['energy_history']}")
+                # print(f"DeviceList: {smart_home_context['controllable_devices']}")
+                # print(f"Sensors: {smart_home_context['sensors']}")
 
                 response_text = await process_category(
                     category, parameters, smart_home_context

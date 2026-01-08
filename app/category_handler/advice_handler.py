@@ -20,12 +20,21 @@ class AdviceHandler(BaseHandler):
             [KONTEXT]
             Energie-Werte: {json.dumps(smart_home_context["energy_context"])}
             
+            [KONTEXT - Verlauf (Letzte 7 Tage)]
+            Das Array zeigt die Differenz zum Vortag (z.B. Verbrauch gestern, vorgestern...).
+            Index 0 = Gestern, Index 1 = Vorgestern, usw.
+            Historie: {json.dumps(smart_home_context.get("energy_history", {}))}
+            
             [ENTSCHEIDUNGS-LOGIK]
             Der User will Beratung über den Zeitpunkt, wann er das genannte Gerät nutzen sollte.
             
             BERATUNG / FRAGE ("Soll ich", "Ist jetzt guter Zeitpunkt")
             Antworte nur mit Text basierend auf diesen Regeln:
                     - Formulierung: kurzer Satz bis höchstens 30 Wörter, wenn möglich konkrete Sensorwerte mit eintragen, die zur Entscheidung geführt haben.
+                    - WICHTIG: Nutze die Historie! 
+                        - Wenn der historische Verbrauch über PV Prognose liegt, diese gar nicht mehr empfehlen.
+                    - Bitte nenne Uhrzeiten in deutscher Zeitzone.
+                    - Wenn Du Zukunfstwerte zeigst (co2 Intensität z.B.), nenne auch den aktuellen Wert.
                     - Annahmen / Rahmenbedingungen:    
                         'netz_saldo_watt' Positiv bedeutet Netzbezug, negativ PV-Einspeisung.
                         'sensor.senec_house_power' ist der Hausverbrauch
