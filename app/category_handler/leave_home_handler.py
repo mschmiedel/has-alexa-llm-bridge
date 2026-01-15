@@ -64,8 +64,13 @@ class LeaveHomeHandler(BaseHandler):
             [REGELN]
             - Wenn alles "Keine/Kein" ist, sag nur: "Alles sicher, schönen Tag!"
             - Erwähne NUR die Dinge, die NICHT "Keine" sind, je einen Satz für jede Liste.
-            - In jedem Satz, erwähne jeden betroffenen Bereich (area), z.b.
-              * In der Diele, Treppe und Küche brennen Lichter, ein Gerät in Waschküche hat einen hohen Verbrauch"
+            - In jedem Satz, erwähne jeden betroffenen Bereich (area)
+            - Beispliele
+              - In der Diele, Treppe und Küche brennen Lichter, ein Gerät in Waschküche hat einen hohen Verbrauch"
+              - Die Lichter in Diele, Bad und Küche sind noch an. Es gibt keine offenen Fenster, Türen oder hohen Energieverbrauch.
+              - Alles ist super!
+              - Waschküche hat einen hohen Energieverbrauch.
+              - Es brennen Lichter in 7 Bereichen, Tür Terrasse ist offen und Waschküche hat hohen Energieverbrauch.
         """
         # --- PROMPT BAUEN ---
 
