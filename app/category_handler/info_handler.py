@@ -1,10 +1,11 @@
 import json
 
 from category_handler.base import BaseHandler
-from const import tools_schema, AI_MODEL_NAME
+from const import tools_schema
 from genai_client.client import get_client
 from ha_service.main import execute_ha_service
 
+AI_MODEL_NAME = "gemini-flash-lite-latest"
 
 class InfoHandler(BaseHandler):
     async def execute(self, parameters, smart_home_context):

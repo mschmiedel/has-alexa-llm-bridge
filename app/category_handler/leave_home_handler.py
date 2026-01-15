@@ -4,7 +4,9 @@ from category_handler.base import BaseHandler
 
 from genai_client.client import get_client
 
-from const import AI_MODEL_NAME, tools_schema
+from const import tools_schema
+
+AI_MODEL_NAME = "gemini-flash-lite-latest"
 
 
 class LeaveHomeHandler(BaseHandler):
