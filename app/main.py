@@ -45,6 +45,7 @@ ENERGY_MAPPING = {
     "niedrigste-co2-prozent": "sensor.strom_prognose_analyse",
     "niedrigste-co2-uhrzeit": "sensor.strom_prognose_analyse_timestamp",
     "waschkueche_power": "sensor.shelly_waschkueche_switch_0_power",
+    "haus_power": "sensor.senec_house_power"
 }
 
 HISTORY_MAPPING = {
