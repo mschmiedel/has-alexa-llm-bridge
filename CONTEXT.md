@@ -39,9 +39,5 @@ Ziel ist eine saubere Trennung von Voice-Interface, Business-Logik und Smart-Hom
 
 Derzeit gibt es technische Schulden, die der Agent beheben soll:
 
-1.  **Inversion of Data Flow (Refactoring):**
-    -   *Ist:* `main.py` holt pauschal Daten und übergibt sie.
-    -   *Soll:* `main.py` instanziiert den `ha_service`. Der Handler bekommt den Service übergeben und ruft `await ha_service.get_relevant_data()` auf.
-
-2.  **Strict Typing:**
+1.  **Strict Typing:**
     -   Ersetzen von `dict` Rückgaben durch Pydantic Models (z.B. `AssistantResponse`), um die API-Schnittstelle hart zu definieren.
