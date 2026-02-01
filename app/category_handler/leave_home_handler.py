@@ -10,9 +10,11 @@ AI_MODEL_NAME = "gemini-flash-lite-latest"
 
 
 class LeaveHomeHandler(BaseHandler):
-    async def execute(self, parameters, smart_home_context):
+    async def execute(self, parameters, ha_service):
         global response_text
         print("LeaveHomeHandler aufgerufen.")
+        
+        smart_home_context = await ha_service.get_smart_home_context()
 
         # Hilfsfunktion für sichere Float-Umwandlung (verhindert Crash bei "unavailable" etc.)
         def safe_float(value):

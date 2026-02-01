@@ -3,16 +3,16 @@ import json
 from category_handler.base import BaseHandler
 
 from genai_client.client import get_client
-from ha_service.main import execute_ha_service
-
 from const import tools_schema
 
 AI_MODEL_NAME = "gemini-flash-lite-latest"
 
 class AdviceHandler(BaseHandler):
-    async def execute(self, parameters, smart_home_context):
+    async def execute(self, parameters, ha_service):
         global response_text
         print("AdviceHandler aufgerufen.")
+        
+        smart_home_context = await ha_service.get_smart_home_context()
 
         print(f"Energie-Werte: {json.dumps(smart_home_context['energy_context'])}")
         system_prompt = f"""
@@ -91,7 +91,7 @@ class AdviceHandler(BaseHandler):
                             eid = fc.args.get("entity_id")
                             act = fc.args.get("action")
                             dom = eid.split(".")[0] if "." in eid else ""
-                            if await execute_ha_service(dom, act, eid):
+                            if await ha_service.execute_ha_service(dom, act, eid):
                                 response_text = f"Okay, {act} für {eid} ausgeführt."
                             else:
                                 response_text = f"Fehler beim Schalten von {eid}."
