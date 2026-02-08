@@ -25,7 +25,6 @@ sys.modules["genai_client.client"] = mock_genai_client_module
 # Import Handler
 try:
     from category_handler.leave_home_handler import LeaveHomeHandler
-    from category_handler.base import HandlerResult
 except ImportError as e:
     logging.error(f"Kritischer Import Fehler im Test: {e}")
     raise
