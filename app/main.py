@@ -39,7 +39,6 @@ async def classify_intent(query: str):
     Kategorien:
     1. "CONTROL" -> Der User will aktiv etwas schalten (Licht an, Rolladen hoch, Heizung aus).
     2. "ADVICE"  -> Der User fragt nach Energie-Entscheidungen (Waschmaschine jetzt? Auto laden?).
-                 -> Sätze konnen z.B. mit "Ist gerade guter Zeitpunkt?" beginnen.
     3. "INFO"    -> Der User will nur Statuswerte wissen (Wie warm ist es? Wieviel Strom verbrauchen wir? Ist Licht im Wohnzimmer an?).
                  -> Beispiele: 
                      - Wie warm ist es?
