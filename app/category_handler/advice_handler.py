@@ -1,16 +1,15 @@
 import json
-
-from category_handler.base import BaseHandler
-
+from typing import List, Any, Dict
+from category_handler.base import BaseHandler, HandlerResult
 from genai_client.client import get_client
 from const import tools_schema
 
 AI_MODEL_NAME = "gemini-flash-lite-latest"
 
 class AdviceHandler(BaseHandler):
-    async def execute(self, parameters, ha_service):
-        global response_text
+    async def execute(self, parameters: List[Any], ha_service: Any, session_attributes: Dict[str, Any] = None, intent_name: str = None) -> HandlerResult:
         print("AdviceHandler aufgerufen.")
+        response_text = "Fehler."
         
         smart_home_context = await ha_service.get_smart_home_context()
 
@@ -65,7 +64,7 @@ class AdviceHandler(BaseHandler):
             
             Input: "Device: Auto"
             Antwort: "Es gibt heute keinen PV Strom mehr, aber CO2 Intensität wird um 18:00 niedrig sein."
-
+            
             Input: "Device: Auto"
             Antwort: "Es gibt heute keinen PV Strom mehr, und CO2 Intensität wird nicht mehr besser."
             
@@ -104,4 +103,4 @@ class AdviceHandler(BaseHandler):
             print(f"AI Error: {e}")
             response_text = "Fehler im KI-Modell."
 
-        return response_text
+        return HandlerResult(text=response_text)

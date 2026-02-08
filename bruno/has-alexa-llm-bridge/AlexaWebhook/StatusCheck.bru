@@ -1,7 +1,7 @@
 meta {
-  name: LeaveHome
+  name: StatusCheck
   type: http
-  seq: 2
+  seq: 3
 }
 
 post {
@@ -33,9 +33,20 @@ body:json {
       "timestamp": "2026-01-03T22:00:00Z",
       "locale": "de-DE",
       "intent": {
-        "name": "LeaveHomeIntent",
-        "confirmationStatus": "NONE"
+        "name": "EnergyAdviceIntent",
+        "confirmationStatus": "NONE",
+        "slots": {
+          "device": {
+            "name": "device",
+            "value": "Waschmaschine"
+          }
+        }
       }
     }
   }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
 }
