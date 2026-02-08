@@ -1,4 +1,3 @@
-import asyncio
 import json
 import traceback
 
@@ -7,7 +6,7 @@ from dotenv import load_dotenv
 
 from category_handler.leave_home_handler import LeaveHomeHandler
 from genai_client.client import get_client
-from const import Category, ALEXA_ACCESS_TOKEN, HA_URL, HA_TOKEN
+from const import Category, ALEXA_ACCESS_TOKEN, HA_URL
 from category_handler.advice_handler import AdviceHandler
 from category_handler.control_handler import ControlHandler
 from category_handler.info_handler import InfoHandler

@@ -111,7 +111,7 @@ class LeaveHomeHandler(BaseHandler):
                 session_attributes={
                     "category": Category.LEAVE_HOME.value, # String value needed for JSON serialization usually
                     "state": "AWAITING_LIGHTS_CONFIRMATION",
-                    "lights_to_turn_off": [l["eid"] for l in aktive_lichter]
+                    "lights_to_turn_off": [light["eid"] for light in aktive_lichter]
                 }
             )
         else:
