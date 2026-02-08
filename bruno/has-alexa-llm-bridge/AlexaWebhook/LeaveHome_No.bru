@@ -1,7 +1,7 @@
 meta {
-  name: LeaveHome
+  name: LeaveHome - No
   type: http
-  seq: 2
+  seq: 6
 }
 
 post {
@@ -18,22 +18,31 @@ body:json {
   {
     "version": "1.0",
     "session": {
-      "new": true,
+      "new": false,
       "sessionId": "test-session-id",
       "application": {
         "applicationId": "amzn1.ask.skill.test"
       },
       "user": {
         "userId": "test-user-id"
+      },
+      "attributes": {
+        "category": 2,
+        "state": "AWAITING_LIGHTS_CONFIRMATION",
+        "lights_to_turn_off": [
+          "light.wohnzimmer_decke",
+          "light.flur",
+          "light.kueche"
+        ]
       }
     },
     "request": {
       "type": "IntentRequest",
-      "requestId": "test-request-id",
-      "timestamp": "2026-01-03T22:00:00Z",
+      "requestId": "test-request-id-no",
+      "timestamp": "2026-01-03T22:00:10Z",
       "locale": "de-DE",
       "intent": {
-        "name": "LeaveHomeIntent",
+        "name": "AMAZON.NoIntent",
         "confirmationStatus": "NONE"
       }
     }

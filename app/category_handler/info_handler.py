@@ -1,15 +1,15 @@
 import json
-
-from category_handler.base import BaseHandler
+from typing import List, Any, Dict
+from category_handler.base import BaseHandler, HandlerResult
 from const import tools_schema
 from genai_client.client import get_client
 
 AI_MODEL_NAME = "gemini-flash-lite-latest"
 
 class InfoHandler(BaseHandler):
-    async def execute(self, parameters, ha_service):
+    async def execute(self, parameters: List[Any], ha_service: Any, session_attributes: Dict[str, Any] = None, intent_name: str = None) -> HandlerResult:
         print("InfoHandler aufgerufen.")
-        # ... hier stehen 100 Zeilen komplexer Code ...
+        response_text = "Fehler."
         
         smart_home_context = await ha_service.get_smart_home_context()
 
@@ -73,4 +73,4 @@ class InfoHandler(BaseHandler):
             print(f"AI Error: {e}")
             response_text = "Fehler im KI-Modell."
 
-        return response_text
+        return HandlerResult(text=response_text)
