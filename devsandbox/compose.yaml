@@ -1,0 +1,19 @@
+services:
+  goose:
+    build: .
+    container_name: goose-sandbox
+    image: smart-home-goose:latest
+    platform: linux/arm64
+    # Hält den Container offen, damit du dich jederzeit verbinden kannst
+    stdin_open: true
+    tty: true
+    volumes:
+      # Dein Code vom Mac
+      - ../:/home/devuser/smart-home:Z
+      # Deine Goose-Config vom Mac
+      - ${HOME}/.config/goose:/home/devuser/.config/goose:Z
+    working_dir: /home/devuser/smart-home
+    # Verhindert Root-Rechte Probleme auf dem Mac
+    user: "devuser"
+    environment:
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
