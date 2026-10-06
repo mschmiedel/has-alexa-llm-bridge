@@ -38,6 +38,7 @@ tools_schema = [
 # Konfiguration
 HA_URL = os.getenv("HA_URL")
 HA_TOKEN = os.getenv("HA_TOKEN")
+EVCC_URL = os.getenv("EVCC_URL")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-2.5-flash-lite")
 ALEXA_ACCESS_TOKEN = os.getenv("ALEXA_ACCESS_TOKEN", "testAccessToken")

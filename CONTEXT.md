@@ -21,6 +21,7 @@ Ziel ist eine saubere Trennung von Voice-Interface, Business-Logik und Smart-Hom
 -   `app/ha_service/`: Kapselt den Zugriff auf Home Assistant.
     -   Sollte Methoden anbieten wie `get_entity_state(entity_id)` oder `get_climate_data(room)`.
     -   Versteckt die Komplexität der HA API und Auth-Token.
+-   `app/evcc_service/`: Kapselt den Zugriff auf evcc (`EVCC_URL`). Liefert den Optimizer-Plan (`/api/state?jq=.evopt`) als Pydantic `Plan` mit 15-Minuten-Slots, Preisen und geplanter Ladung. Der `AdviceHandler` nutzt ausschließlich diesen Service, keine HA-Zustände.
 -   `app/genai_client/`: Wrapper für Gemini API.
 
 ## 3. Coding Standards
