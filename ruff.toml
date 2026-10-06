@@ -1,2 +1,7 @@
 # Wir sagen dem Linter: "Tu so, als ob wir auf Python 3.11 sind"
 target-version = "py312"
+
+[lint]
+# Die Regeln, die bis Ruff 0.15 Standard waren. Die erweiterten Standardregeln
+# neuerer Versionen sind noch nicht aufgeräumt (siehe Issue)
+select = ["E4", "E7", "E9", "F"]
