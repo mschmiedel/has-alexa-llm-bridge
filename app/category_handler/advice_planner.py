@@ -1,10 +1,9 @@
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel
-
 from category_handler.device_profiles import DeviceProfile
 from evcc_service.models import Plan, PlanSlot
+from pydantic import BaseModel
 
 # Unterschied unter dieser Schwelle gilt als "egal"
 MIN_SAVING_EUR = 0.10

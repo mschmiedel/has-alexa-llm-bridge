@@ -1,3 +1,5 @@
+from itertools import pairwise
+
 from pydantic import BaseModel
 
 
@@ -14,7 +16,7 @@ class DeviceProfile(BaseModel):
         points = self.power_curve
         if temperature <= points[0][0]:
             return points[0][1]
-        for (t0, p0), (t1, p1) in zip(points, points[1:]):
+        for (t0, p0), (t1, p1) in pairwise(points):
             if temperature <= t1:
                 return p0 + (p1 - p0) * (temperature - t0) / (t1 - t0)
         return points[-1][1]

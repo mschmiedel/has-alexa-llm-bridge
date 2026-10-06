@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from category_handler.advice_planner import (
@@ -123,10 +123,10 @@ class AdviceHandler(BaseHandler):
 
     async def execute(
         self,
-        parameters: List[Any],
+        parameters: list[Any],
         ha_service: Any = None,
-        session_attributes: Dict[str, Any] = None,
-        intent_name: str = None,
+        session_attributes: dict[str, Any] | None = None,
+        intent_name: str | None = None,
     ) -> HandlerResult:
         logger.info("AdviceHandler aufgerufen.")
         device = str(parameters[0]) if parameters else ""
@@ -155,7 +155,7 @@ class AdviceHandler(BaseHandler):
         logger.info(f"Beratung: {json.dumps(facts, ensure_ascii=False)}")
         return HandlerResult(await self._phrase(facts, parameters))
 
-    async def _phrase(self, facts: dict[str, Any], parameters: List[Any]) -> str:
+    async def _phrase(self, facts: dict[str, Any], parameters: list[Any]) -> str:
         prompt = PROMPT.format(
             advice=json.dumps(facts, ensure_ascii=False), parameters=parameters
         )
@@ -167,6 +167,6 @@ class AdviceHandler(BaseHandler):
             )
             if response.text:
                 return response.text
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 Gemini-SDK wirft vielfältige Fehler, es gibt den Template-Fallback
             logger.error(f"AI Error: {e}")
         return _fallback_text(facts)

@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../app")))
 
-from category_handler.advice_handler import AdviceHandler  # noqa: E402
-from evcc_service.main import EvccUnavailableError, build_plan  # noqa: E402
-from evcc_service.models import EvoptResponse  # noqa: E402
+from category_handler.advice_handler import AdviceHandler
+from evcc_service.main import EvccUnavailableError, build_plan
+from evcc_service.models import EvoptResponse
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "evopt_sample.json")
 

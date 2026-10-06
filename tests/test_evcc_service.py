@@ -8,9 +8,14 @@ import httpx
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../app")))
 
-from evcc_service.main import EvccService, EvccUnavailableError  # noqa: E402
+from evcc_service.main import EvccService, EvccUnavailableError
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "evopt_sample.json")
+
+
+def load_fixture() -> dict:
+    with open(FIXTURE) as f:
+        return json.load(f)
 
 
 def _state_only(body):
@@ -32,8 +37,7 @@ def _client_returning(handler):
 
 class TestEvccService(unittest.IsolatedAsyncioTestCase):
     async def test_get_plan_parses_real_response(self):
-        with open(FIXTURE) as f:
-            body = json.load(f)
+        body = load_fixture()
         requests = []
 
         def handler(request: httpx.Request) -> httpx.Response:
@@ -55,8 +59,7 @@ class TestEvccService(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(first.temperature)
 
     async def test_temperature_forecast_is_attached(self):
-        with open(FIXTURE) as f:
-            body = json.load(f)
+        body = load_fixture()
         start = body["details"]["timestamp"][1]
 
         def handler(request: httpx.Request) -> httpx.Response:
@@ -72,8 +75,7 @@ class TestEvccService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plan.slots[1].temperature, 7.5)
 
     async def test_device_without_name(self):
-        with open(FIXTURE) as f:
-            body = json.load(f)
+        body = load_fixture()
         del body["details"]["batteryDetails"][0]["name"]
 
         with _client_returning(_state_only(body)):
@@ -83,23 +85,32 @@ class TestEvccService(unittest.IsolatedAsyncioTestCase):
         self.assertIn("vehicle:0", plan.slots[0].charge_wh)
 
     async def test_missing_url(self):
-        with self.assertRaises(EvccUnavailableError):
-            await EvccService("").get_plan()
+        with (
+            patch("evcc_service.main.EVCC_URL", None),
+            self.assertRaises(EvccUnavailableError),
+        ):
+            await EvccService().get_plan()
 
     async def test_missing_plan(self):
-        with _client_returning(lambda r: httpx.Response(200, json=None)):
-            with self.assertRaises(EvccUnavailableError):
-                await EvccService("https://evcc.example").get_plan()
+        with (
+            _client_returning(lambda r: httpx.Response(200, json=None)),
+            self.assertRaises(EvccUnavailableError),
+        ):
+            await EvccService("https://evcc.example").get_plan()
 
     async def test_http_error(self):
-        with _client_returning(lambda r: httpx.Response(500)):
-            with self.assertRaises(EvccUnavailableError):
-                await EvccService("https://evcc.example").get_plan()
+        with (
+            _client_returning(lambda r: httpx.Response(500)),
+            self.assertRaises(EvccUnavailableError),
+        ):
+            await EvccService("https://evcc.example").get_plan()
 
     async def test_unexpected_format(self):
-        with _client_returning(lambda r: httpx.Response(200, json={"foo": 1})):
-            with self.assertRaises(EvccUnavailableError):
-                await EvccService("https://evcc.example").get_plan()
+        with (
+            _client_returning(lambda r: httpx.Response(200, json={"foo": 1})),
+            self.assertRaises(EvccUnavailableError),
+        ):
+            await EvccService("https://evcc.example").get_plan()
 
 
 if __name__ == "__main__":

@@ -1,15 +1,23 @@
 import os
 import sys
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../app")))
 
-from category_handler.advice_planner import Verdict, advise_appliance, advise_vehicle  # noqa: E402
-from category_handler.device_profiles import DeviceProfile, is_vehicle, profile_for  # noqa: E402
-from evcc_service.models import Plan, PlanDevice, PlanSlot  # noqa: E402
+from category_handler.advice_planner import (
+    Verdict,
+    advise_appliance,
+    advise_vehicle,
+)
+from category_handler.device_profiles import (
+    DeviceProfile,
+    is_vehicle,
+    profile_for,
+)
+from evcc_service.models import Plan, PlanDevice, PlanSlot
 
-START = datetime(2026, 10, 7, 6, 0, tzinfo=timezone.utc)
+START = datetime(2026, 10, 7, 6, 0, tzinfo=UTC)
 GRID = 0.30
 FEEDIN = 0.07
 PROFILE = DeviceProfile(name="Test", power_w=1000, duration_min=60)
